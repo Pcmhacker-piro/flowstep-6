@@ -780,15 +780,24 @@ function AppHome() {
   ): Promise<{ target: PartSelection; newSnippet: string }> {
     const { data: sessionData } = await supabase.auth.getSession();
     const bearer = sessionData.session?.access_token;
-    const res = await fetch("/api/edit-part", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-      },
-      body: JSON.stringify({ snippet: target.snippet, prompt: p, model }),
-      signal,
-    });
+    const requestEdit = () =>
+      fetch("/api/edit-part", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+        },
+        body: JSON.stringify({ snippet: target.snippet, prompt: p, model }),
+        signal,
+      });
+
+    let res = await requestEdit();
+    // The dev/edge server can briefly return 502/503/504 while restarting; retry once.
+    for (let attempt = 0; attempt < 2 && [502, 503, 504].includes(res.status); attempt++) {
+      await new Promise((r) => setTimeout(r, 1200));
+      if (signal.aborted) break;
+      res = await requestEdit();
+    }
     if (!res.ok || !res.body) {
       throw new Error((await res.text().catch(() => "")) || `Edit failed (${res.status})`);
     }
