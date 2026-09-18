@@ -1684,7 +1684,7 @@ function AppHome() {
             >
               {items.map((item) => {
                 const selected = selectedId === item.id;
-                const commonCls = `absolute ${selected ? "outline outline-2 outline-[#2b6bff]" : ""}`;
+                const commonCls = `absolute ${selected ? "outline outline-2 outline-transparent" : ""}`;
                 if (item.type === "design") {
                   const isPartial = item.isFinal === false;
                   const designTargets = editTargets.filter((t) => t.designId === item.id);
