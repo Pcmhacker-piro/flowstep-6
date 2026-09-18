@@ -1684,11 +1684,10 @@ function AppHome() {
             >
               {items.map((item) => {
                 const selected = selectedId === item.id;
-                const commonCls = `absolute ${selected ? "outline outline-2 outline-[#2b6bff]" : ""}`;
+                const commonCls = `absolute ${selected ? "outline outline-2 outline-transparent" : ""}`;
                 if (item.type === "design") {
                   const isPartial = item.isFinal === false;
                   const designTargets = editTargets.filter((t) => t.designId === item.id);
-                  const isEditTarget = designTargets.length > 0;
                   return (
                     <div
                       key={item.id}
@@ -1699,9 +1698,7 @@ function AppHome() {
                       style={{ position: "absolute", left: item.x, top: item.y, width: item.w, height: item.h }}
                       className={`${commonCls} group rounded-2xl bg-white shadow-2xl ${
                         selectMode && !isPartial ? "cursor-crosshair" : "cursor-move"
-                      } ${isPartial ? "animated-rainbow-border" : ""} ${
-                        isEditTarget ? "ring-2 ring-[#2b6bff] ring-offset-2 ring-offset-[#f4eefc]" : ""
-                      }`}
+                      } ${isPartial ? "animated-rainbow-border" : ""}`}
                     >
                       {item.screenName ? (
                         <div className="pointer-events-none absolute -top-7 left-0 z-10 max-w-full truncate text-[12px] font-semibold text-[#0b1220]/60">
