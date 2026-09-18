@@ -168,7 +168,13 @@ export async function streamChatWithUserKey(params: {
     ? params.model
     : mapModelForProvider(params.provider, params.model);
   const candidates = [primary];
-  if (params.provider === "gemini" && primary !== "gemini-flash-latest") candidates.push("gemini-flash-latest");
+  if (params.provider === "gemini") {
+    // Free Gemini keys have no quota on the "-latest" / preview aliases (they resolve to paid
+    // tiers and 429 immediately), so fall through to models a free key can actually serve.
+    for (const fallback of ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest"]) {
+      if (!candidates.includes(fallback)) candidates.push(fallback);
+    }
+  }
 
   const attempt = async (model: string) => {
     const messages: Array<{ role: string; content: string }> = [
