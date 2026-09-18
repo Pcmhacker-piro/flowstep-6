@@ -999,7 +999,6 @@ function AppHome() {
     const preGenSnapshot = itemsRef.current;
     const screenIds = new Map<string, string>();
     const htmlByScreen = new Map<string, string>();
-    const pendingFlushes = new Map<string, number>();
     let manifested = false;
     let completedCount = 0;
     let failedCount = 0;
@@ -1050,15 +1049,6 @@ function AppHome() {
         });
       };
 
-      const scheduleScreenFlush = (screenId: string) => {
-        if (pendingFlushes.has(screenId)) return;
-        const timer = window.setTimeout(() => {
-          pendingFlushes.delete(screenId);
-          flushScreen(screenId, false);
-        }, 180);
-        pendingFlushes.set(screenId, timer);
-      };
-
       const parser = createParser({
         onEvent(event) {
           let payload:
@@ -1097,12 +1087,8 @@ function AppHome() {
             setProgressStep(3);
           } else if (payload.type === "screen-delta") {
             htmlByScreen.set(payload.screenId, (htmlByScreen.get(payload.screenId) ?? "") + payload.delta);
-            if ((htmlByScreen.get(payload.screenId)?.length ?? 0) > 1800) scheduleScreenFlush(payload.screenId);
             setProgressStep(4);
           } else if (payload.type === "screen-complete") {
-            const timer = pendingFlushes.get(payload.screenId);
-            if (timer !== undefined) window.clearTimeout(timer);
-            pendingFlushes.delete(payload.screenId);
             flushScreen(payload.screenId, true);
           } else if (payload.type === "screen-error") {
             failedCount += 1;
@@ -1133,8 +1119,6 @@ function AppHome() {
         reader.cancel().catch(() => {});
       }
 
-      pendingFlushes.forEach((timer) => window.clearTimeout(timer));
-      pendingFlushes.clear();
       if (streamError) throw new Error(streamError);
       if (!manifested) throw new Error("Design stream ended without a screen plan");
       setItems((current) => {

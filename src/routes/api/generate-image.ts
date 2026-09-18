@@ -19,8 +19,10 @@ function eventChunk(event: StreamEvent) {
 
 const outputContract = `OUTPUT CONTRACT
 - Return raw HTML only. Start with <!doctype html>. No markdown or commentary.
-- Include meta charset, viewport, Tailwind CDN, and Google Fonts links for the typefaces named below.
-- Use HTML and Tailwind only. The only script permitted is the Tailwind CDN.
+- Include meta charset, viewport, and one complete <style> block in the document head.
+- Use semantic HTML and embedded CSS only. Do not use Tailwind, external scripts, external stylesheets, or any runtime dependency.
+- The page must look fully designed on its first render, even without network access.
+- Never output skeletons, loading placeholders, wireframes, grey placeholder blocks, or unfinished sections.
 - Finish the entire document, including closing body and html tags.`;
 
 const appDesignSystem = `You are a principal product designer and senior frontend engineer. Create ONE complete 1440x960 application screen as a self-contained HTML document.
@@ -275,14 +277,21 @@ function gatewayMessage(status: number, body: string) {
   }
 }
 
-/** True when the produced markup looks unfinished (cut off mid-document). */
+/** True when the produced markup is cut off or is not a complete styled page. */
 function looksTruncated(text: string) {
   const trimmed = text.trimEnd();
   if (!trimmed) return true;
-  if (/<\/html>\s*$/i.test(trimmed)) return false;
-  if (/<\/body>\s*$/i.test(trimmed)) return false;
-  // A complete top-level section normally ends on a closing tag.
-  return !/>$/.test(trimmed);
+  return !/<\/body>\s*<\/html>\s*$/i.test(trimmed);
+}
+
+function validateGeneratedHtml(text: string) {
+  const normalized = text.replace(/^```(?:html)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  if (looksTruncated(normalized)) return "The design output ended before the page was complete.";
+  if (!/^<!doctype html>/i.test(normalized)) return "The design output was not a complete HTML document.";
+  if (!/<head[\s>]/i.test(normalized) || !/<body[\s>]/i.test(normalized)) return "The design output is missing its page structure.";
+  if (!/<style[\s>][\s\S]*?<\/style>/i.test(normalized)) return "The design output is missing its visual styling.";
+  if (normalized.length < 3000) return "The design output was too incomplete to display as a finished screen.";
+  return null;
 }
 
 /**
@@ -371,6 +380,8 @@ async function streamByoScreen(params: {
   }
 
   if (!produced) throw new Error(providerError || "Your own provider key returned no design output for this screen.");
+  const validationError = validateGeneratedHtml(produced);
+  if (validationError) throw new Error(validationError);
   emit({ type: "screen-complete", screenId });
 }
 
@@ -444,6 +455,7 @@ async function streamOneScreen(params: {
 
   let completed = false;
   let streamError = "";
+  let produced = "";
   const parser = createParser({
     onEvent(event) {
       if (!event.data || event.data === "[DONE]") return;
@@ -459,6 +471,7 @@ async function streamOneScreen(params: {
         return;
       }
       if (payload.type === "response.output_text.delta" && typeof payload.delta === "string") {
+        produced += payload.delta;
         emit({ type: "screen-delta", screenId: screen.id, delta: payload.delta });
       } else if (payload.type === "response.completed") {
         completed = true;
@@ -481,6 +494,8 @@ async function streamOneScreen(params: {
 
   if (streamError) throw new Error(streamError);
   if (!completed) throw new Error("The design stream ended before this screen was complete.");
+  const validationError = validateGeneratedHtml(produced);
+  if (validationError) throw new Error(validationError);
   emit({ type: "screen-complete", screenId: screen.id });
 }
 
