@@ -168,7 +168,13 @@ export async function streamChatWithUserKey(params: {
     ? params.model
     : mapModelForProvider(params.provider, params.model);
   const candidates = [primary];
-  if (params.provider === "gemini" && primary !== "gemini-flash-latest") candidates.push("gemini-flash-latest");
+  if (params.provider === "gemini") {
+    // Free Gemini keys have no quota on the "-latest" / preview aliases (they resolve to paid
+    // tiers and 429 immediately), so fall through to models a free key can actually serve.
+    for (const fallback of ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest"]) {
+      if (!candidates.includes(fallback)) candidates.push(fallback);
+    }
+  }
 
   const attempt = async (model: string) => {
     const messages: Array<{ role: string; content: string }> = [
@@ -205,15 +211,17 @@ export async function streamChatWithUserKey(params: {
 
   let last: Response | null = null;
   for (const model of candidates) {
-    for (let tries = 0; tries < 3; tries += 1) {
+    // A 429 here is a per-model quota block, not a burst limit — move to the next
+    // model instead of burning seconds on backoff. Only 5xx is worth retrying.
+    const maxTries = 3;
+    for (let tries = 0; tries < maxTries; tries += 1) {
       const res = await attempt(model);
       if (res.ok) return res;
       last = res;
-      const retryable = res.status === 429 || res.status >= 500;
-      if (!retryable) break;
-      if (tries < 2) {
+      if (res.status < 500) break;
+      if (tries < maxTries - 1) {
         await res.body?.cancel().catch(() => {});
-        await sleep(4000 * (tries + 1));
+        await sleep(2000 * (tries + 1));
       }
     }
     if (last && last.status !== 429 && last.status !== 404 && last.status < 500) break;
