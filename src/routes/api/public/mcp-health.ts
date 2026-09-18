@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import mcp from "@/lib/mcp";
-import manifest from "../../../../.lovable/mcp/manifest.json" with { type: "json" };
+import manifest from "@/lib/mcp-manifest.json" with { type: "json" };
 
 // Unauthenticated liveness endpoint for the MCP server.
 // Lives under /api/public/* so the platform's auth gate leaves it open to any
