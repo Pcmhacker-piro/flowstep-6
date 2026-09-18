@@ -1688,7 +1688,6 @@ function AppHome() {
                 if (item.type === "design") {
                   const isPartial = item.isFinal === false;
                   const designTargets = editTargets.filter((t) => t.designId === item.id);
-                  const isEditTarget = designTargets.length > 0;
                   return (
                     <div
                       key={item.id}
